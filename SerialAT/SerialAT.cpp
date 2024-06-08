@@ -74,14 +74,14 @@ int main(int argc, char* argv[])
 	COMMTIMEOUTS timeouts = { 0 };
 	int retVal = -1;
 
-	if (argc != 0 && argc != 3)
+	if (argc != 1 && argc != 3)
 	{
 		fprintf(stderr, "Improper usage, use 0 arguments for test, or 2 for sending a message");
 	}
 
 	std::string recipient;
 	std::string message;
-	if (argc == 0)
+	if (argc == 1)
 	{
 		recipient = "+447874608569";
 		message = "Test message!";
