@@ -20,22 +20,19 @@ This code sends the AT command AT+CMGF=1 to set the modem to text mode, then sen
 #include <mutex>
 #include "SerialAT.h"
 
-std::mutex printMutex;
+std::mutex writeMutex;
 bool keepReading = true;
 
 int WriteSerial(HANDLE hSerial, LPCVOID lpMessage, DWORD nNumberOfBytes, DWORD& bytes_written)
 {
-	printMutex.lock();
 	if (!WriteFile(hSerial, lpMessage, nNumberOfBytes, &bytes_written, NULL))
 	{
 		fprintf(stderr, "Error writing to serial port.\n");
 
 		CloseHandle(hSerial);
-		printMutex.unlock();
 		return 1;
 	}
 	fprintf(stderr, "%d bytes written. Message: %s\n", bytes_written, (char*)lpMessage);
-	printMutex.unlock();
 
 	return 0;
 }
@@ -46,18 +43,15 @@ DWORD dwBytesRead = 0;
 int readCount = 0;
 int ReadSerial(HANDLE hSerial)
 {
-	printMutex.lock();
 	if (!ReadFile(hSerial, readSzBuff, readBufSize, &dwBytesRead, NULL))
 	{
 		fprintf(stderr, "Error reading from serial port\n");
 
 		CloseHandle(hSerial);
-		printMutex.unlock();
 		return 1;
 	}
-	
+
 	fprintf(stderr, "Response(%d): %s\n", ++readCount, readSzBuff);
-	printMutex.unlock();
 
 	return 0;
 }
@@ -73,16 +67,31 @@ void ReadSerialContinously(HANDLE hSerial)
 	}
 }
 
-int main()
+int main(int argc, char* argv[])
 {
 	HANDLE hSerial;
 	DCB dcbSerialParams = { 0 };
 	COMMTIMEOUTS timeouts = { 0 };
 	int retVal = -1;
 
+	if (argc != 0 && argc != 3)
+	{
+		fprintf(stderr, "Improper usage, use 0 arguments for test, or 2 for sending a message");
+	}
 
-	std::string recipient = "+447874608569";
-	std::string message = "Hello, World!4";
+	std::string recipient;
+	std::string message;
+	if (argc == 0)
+	{
+		recipient = "+447874608569";
+		message = "Test message!";
+	}
+	else
+	{
+		recipient = argv[1];
+		message = argv[2];
+	}
+
 
 	// Open the highest available serial port number
 	fprintf(stderr, "Opening serial port...");
@@ -155,14 +164,9 @@ int main()
 	retVal = WriteSerial(hSerial, cmd.c_str(), cmd.length(), bytes_written);
 	if (retVal == 1) return retVal;
 
-
-	retVal = ReadSerial(hSerial);
-	if (retVal == 1) return retVal;
-
 	// Send the message ("Ctrl+Z" character)
 	retVal = WriteSerial(hSerial, "\x1A", 1, bytes_written);
 	if (retVal == 1) return retVal;
-
 
 	retVal = ReadSerial(hSerial);
 	if (retVal == 1) return retVal;
