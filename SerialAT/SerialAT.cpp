@@ -14,10 +14,13 @@ This code sends the AT command AT+CMGF=1 to set the modem to text mode, then sen
 
 #include <windows.h>
 #include <iostream>
+#include <sstream>
 #include <string>
 #include <chrono>
+#include <ctime> 
 #include <thread>
 #include <mutex>
+#include <iomanip>
 #include "SerialAT.h"
 
 std::mutex writeMutex;
@@ -37,12 +40,14 @@ int WriteSerial(HANDLE hSerial, LPCVOID lpMessage, DWORD nNumberOfBytes, DWORD& 
 	return 0;
 }
 
-const int readBufSize = 1024;
-char readSzBuff[readBufSize] = { 0 };
-DWORD dwBytesRead = 0;
-int readCount = 0;
+
 int ReadSerial(HANDLE hSerial)
 {
+	const int readBufSize = 1024;
+	char readSzBuff[readBufSize] = { 0 };
+	DWORD dwBytesRead = 0;
+	int readCount = 0;
+
 	if (!ReadFile(hSerial, readSzBuff, readBufSize, &dwBytesRead, NULL))
 	{
 		fprintf(stderr, "Error reading from serial port\n");
@@ -67,6 +72,25 @@ void ReadSerialContinously(HANDLE hSerial)
 	}
 }
 
+static wchar_t* prefixComPort(char* comPort)
+{
+	const wchar_t* comprefix = L"\\\\.\\";
+	const int comPortFull_len = 20;
+	wchar_t comPortFull[comPortFull_len];
+	wcscpy_s(comPortFull, comprefix);
+
+
+	size_t out_len;
+	auto comPort_w_len = strlen(comPort) + 1;
+	wchar_t* comPort_w = new wchar_t[comPort_w_len];
+	mbstowcs_s(&out_len, comPort_w, comPort_w_len, comPort, comPort_w_len - 1);
+
+	wcscat_s(comPortFull, comPort_w);
+	delete[] comPort_w;
+
+	return comPortFull;
+}
+
 int main(int argc, char* argv[])
 {
 	HANDLE hSerial;
@@ -74,28 +98,44 @@ int main(int argc, char* argv[])
 	COMMTIMEOUTS timeouts = { 0 };
 	int retVal = -1;
 
-	if (argc != 1 && argc != 3)
+	/*
+	SerialAT.cpp COM4: test
+	SerialAT.cpp COM4 +447874608569 "Message":
+	*/
+	if (argc != 2 && argc != 4)
 	{
-		fprintf(stderr, "Improper usage, use 0 arguments for test, or 2 for sending a message");
+		fprintf(stderr, "Improper usage. Arguments: *.exe COMPort [number \"message\"]");
+		return -1;
 	}
 
+	char* comPort = argv[1];
 	std::string recipient;
 	std::string message;
-	if (argc == 1)
+	if (argc == 2)
 	{
+		auto now = std::chrono::system_clock::now();
+		std::time_t now_time_t = std::chrono::system_clock::to_time_t(now);
+		std::ostringstream oss;
+		tm localTime_tm;
+		localtime_s(&localTime_tm, &now_time_t);
+		oss << std::put_time(&localTime_tm, "%Y-%m-%d %H:%M:%S");
+
 		recipient = "+447874608569";
-		message = "Test message!";
+		message = "Test message! " + oss.str();
 	}
-	else
+	else if (argc == 4)
 	{
-		recipient = argv[1];
-		message = argv[2];
+		recipient = argv[2];
+		message = argv[3];
 	}
 
 
 	// Open the highest available serial port number
 	fprintf(stderr, "Opening serial port...");
-	hSerial = CreateFile(L"\\\\.\\COM4", GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+
+	wchar_t* comPortFull = prefixComPort(comPort);
+
+	hSerial = CreateFile(comPortFull, GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 	if (hSerial == INVALID_HANDLE_VALUE)
 	{
 		fprintf(stderr, "Error\n");
