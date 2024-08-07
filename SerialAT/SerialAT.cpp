@@ -6,7 +6,7 @@
 Set the modem to text mode with the command AT+CMGF=1.
 Enter the recipient’s number with the command AT+CMGS="<recipient_number>". Replace <recipient_number> with the actual phone number of the recipient.
 Type your message. After the AT+CMGS command, you should be able to type your message1.
-Send the message. After typing your message, send it by pressing Ctrl+Z
+Send the message. After typing your message, send it by pressing Ctrl+Z (which terminates the message with null char)
 
 * To Read SMSs
 This code sends the AT command AT+CMGF=1 to set the modem to text mode, then sends the AT command AT+CMGL="ALL" to list all SMS messages1. AT+CMGL=? to see all possible values.
